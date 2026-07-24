@@ -1,0 +1,333 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torchvision
+import torchvision.transforms as transforms
+from torchvision import models
+from torch.utils.data import DataLoader, random_split, TensorDataset
+
+print("CIFAR10 data set")
+
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+
+'''
+
+from torchvision.datasets import FakeData
+
+transform = transforms.Compose([
+    transforms.ToTensor()
+])
+
+full_train = FakeData(
+    size=500,
+    image_size=(3, 32, 32),
+    num_classes=10,
+    transform=transform
+)
+
+test_set = FakeData(
+    size=100,
+    image_size=(3, 32, 32),
+    num_classes=10,
+    transform=transform
+)
+
+
+train_size = 400
+probe_size = 100
+
+train_set, probe_set = random_split(full_train, [train_size, probe_size])
+
+train_loader = DataLoader(train_set, batch_size=32, shuffle=True)
+probe_loader = DataLoader(probe_set, batch_size=32, shuffle=False)
+test_loader = DataLoader(test_set, batch_size=32, shuffle=False)
+
+'''
+
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+])
+
+full_train = torchvision.datasets.CIFAR10(
+    root="./data",
+    train=True,
+    download=True,
+    transform=transform
+)
+
+test_set = torchvision.datasets.CIFAR10(
+    root="./data",
+    train=False,
+    download=True,
+    transform=transform
+)
+
+train_size = 40000
+probe_size = 10000
+
+train_set, probe_set = random_split(full_train, [train_size, probe_size])
+
+train_loader = DataLoader(train_set, batch_size=32, shuffle=True)
+probe_loader = DataLoader(probe_set, batch_size=32, shuffle=False)
+test_loader = DataLoader(test_set, batch_size=32, shuffle=False)
+
+
+base_model = models.googlenet(
+    weights=None,
+    aux_logits=False,
+    num_classes=10
+).to(device)
+
+base_optimizer = optim.SGD(
+    base_model.parameters(),
+    lr=1e-3,
+    momentum=0.9,
+    weight_decay=5e-4
+)
+
+criterion = nn.CrossEntropyLoss()
+
+for epoch in range(50):
+    base_model.train()
+    total_loss = 0
+    correct = 0
+    total = 0
+
+    for images, labels in train_loader:
+        images, labels = images.to(device), labels.to(device)
+
+        base_optimizer.zero_grad()
+        outputs = base_model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        base_optimizer.step()
+
+        total_loss += loss.item()
+        preds = outputs.argmax(dim=1)
+        correct += (preds == labels).sum().item()
+        total += labels.size(0)
+
+    print(
+        f"Base epoch {epoch+1}/50 | "
+        f"loss={total_loss/len(train_loader):.4f} | "
+        f"acc={100*correct/total:.2f}%"
+    )
+
+def finr(percent):
+    for images, labels in train_loader:
+
+        images = images.to(device)
+        labels = labels.to(device)
+    
+        cutoff = int(
+            percent * len(images)
+        )
+
+
+
+        top_images = images[:cutoff].to(device)
+
+        top_labels = labels[:cutoff].to(device)
+
+        base_model.eval()
+
+        with torch.no_grad():
+
+            outputs = base_model(top_images)
+
+            loss = criterion(
+                outputs,
+                top_labels
+            )
+
+            preds = outputs.argmax(dim=1)
+
+            correct = (
+                preds == top_labels
+            ).sum().item()
+    
+            total = top_labels.size(0)
+
+        print(
+            f"DR={percent:.1f} "
+            f"loss={loss.item():.4f} "
+            f"acc={100*correct/total:.2f}%"
+            )
+
+print("Random") 
+percent=0.1
+for I in range(10):
+    finr(percent)
+    percent+=0.1
+
+
+def create_meta_dataset(base_model, loader):
+    base_model.eval()
+
+    meta_images = []
+    meta_labels = []
+
+    with torch.no_grad():
+        for images, labels in loader:
+            images = images.to(device)
+            labels = labels.to(device)
+
+            outputs = base_model(images)
+            predictions = outputs.argmax(dim=1)
+
+            correct = (predictions == labels).long()
+
+            meta_images.append(images.cpu())
+            meta_labels.append(correct.cpu())
+
+    meta_images = torch.cat(meta_images)
+    meta_labels = torch.cat(meta_labels)
+
+    return TensorDataset(meta_images, meta_labels)
+
+fc rate of success from above
+int fc1 = 1-fc
+
+Train the joint distribution here? earlier? by this point
+function is called j()
+
+
+
+def BayesModelTrain(correct):
+    BMN=j(image[1],correct) #BMN stands for Bayesian Model Numerator
+
+    for i in range (len(images)-1):
+        BM=j(image[i],correct)*BM
+
+    return BM
+
+phic=BayesModelTrain(Whatevercorrectis)/(fc**(len(images)-1)
+phic1=BayesModelTrain(whateverincorrectis)/fc1**(len(images)-1)
+
+def BM():
+    phic/(phic+phic1)
+
+
+'''
+meta_train_set = create_meta_dataset(base_model, probe_loader)
+meta_train_loader = DataLoader(meta_train_set, batch_size=32, shuffle=True)
+
+meta_model = models.resnet50(weights=None)
+meta_model.fc = nn.Linear(meta_model.fc.in_features, 2)
+meta_model = meta_model.to(device)
+
+meta_optimizer = optim.SGD(
+    meta_model.parameters(),
+    lr=1e-3,
+    momentum=0.7,
+    weight_decay=5e-2
+)
+
+meta_train_set = create_meta_dataset(base_model, probe_loader)
+
+meta_labels = torch.tensor([label for _, label in meta_train_set])
+print("Meta dataset size:", len(meta_train_set))
+print("Base correct labels:", meta_labels.sum().item())
+print("Base wrong labels:", len(meta_labels) - meta_labels.sum().item())
+
+for epoch in range(5):
+    meta_model.train()
+    total_loss = 0
+    correct = 0
+    total = 0
+
+    for images, correctness_labels in meta_train_loader:
+        images = images.to(device)
+        correctness_labels = correctness_labels.to(device)
+
+        meta_optimizer.zero_grad()
+        outputs = meta_model(images)
+        loss = criterion(outputs, correctness_labels)
+        loss.backward()
+        meta_optimizer.step()
+
+        total_loss += loss.item()
+        preds = outputs.argmax(dim=1)
+        correct += (preds == correctness_labels).sum().item()
+        total += correctness_labels.size(0)
+
+    print(
+        f"Meta epoch {epoch+1}/5 | "
+        f"loss={total_loss/len(meta_train_loader):.4f} | "
+        f"acc={100*correct/total:.2f}%"
+    )
+'''    
+
+print("Sorting")
+
+all_conf = []
+all_images = []
+all_labels = []
+
+meta_model.eval()
+
+with torch.no_grad():
+    for images, labels in test_loader:
+        images = images.to(device)
+
+        meta_outputs = meta_model(images)
+        confidence = torch.softmax(meta_outputs, dim=1)[:, 1]
+
+        all_conf.append(confidence.cpu())
+        all_images.append(images.cpu())
+        all_labels.append(labels.cpu())
+
+all_conf = torch.cat(all_conf)
+all_images = torch.cat(all_images)
+all_labels = torch.cat(all_labels)
+
+indices = torch.argsort(all_conf, descending=True)
+
+sorted_conf = all_conf[indices]
+sorted_images = all_images[indices]
+sorted_labels = all_labels[indices]
+
+def fin(percent):
+
+    cutoff = int(
+        percent * len(sorted_images)
+    )
+
+    top_images = sorted_images[:cutoff].to(device)
+
+    top_labels = sorted_labels[:cutoff].to(device)
+
+    base_model.eval()
+
+    with torch.no_grad():
+
+        outputs = base_model(top_images)
+
+        loss = criterion(
+            outputs,
+            top_labels
+        )
+
+        preds = outputs.argmax(dim=1)
+
+        correct = (
+            preds == top_labels
+        ).sum().item()
+
+        total = top_labels.size(0)
+
+    print(
+        f"DR={percent:.1f} "
+        f"loss={loss.item():.4f} "
+        f"acc={100*correct/total:.2f}%"
+        )
+
+        
+percent=0.1
+for I in range(10):
+    fin(percent)
+    percent+=0.1
+
+
+

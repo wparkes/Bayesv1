@@ -113,7 +113,7 @@ for epoch in range(50):
         f"loss={total_loss/len(train_loader):.4f} | "
         f"acc={100*correct/total:.2f}%"
     )
-
+'''
 def finr(percent):
     for images, labels in train_loader:
 
@@ -160,6 +160,7 @@ percent=0.1
 for I in range(10):
     finr(percent)
     percent+=0.1
+'''
 
 
 def create_meta_dataset(base_model, loader):
@@ -184,29 +185,55 @@ def create_meta_dataset(base_model, loader):
     meta_images = torch.cat(meta_images)
     meta_labels = torch.cat(meta_labels)
 
+    for i in range(len(meta_images)):
+        normalparams(meta_images[i],meta_labels[i],0)
+
+    normalparams(meta_images[i],meta_labels[i],1)
+
     return TensorDataset(meta_images, meta_labels)
 
-fc rate of success from above
+fc=correct/total 
 int fc1 = 1-fc
+cmu=[]
+csigma=[]
+mu=[]
+sigma=[]
+cn,n=0
 
-Train the joint distribution here? earlier? by this point
-function is called j()
+def normalparams(image, correct,finished):
+    if (finished==0):
+        if (correct==1):
+            cmu=cmu+image
+            cn+=1
+        
+        if (correct==0):
+            mu=mu+image
+            n+=1
+
+    if (finished==1):
+        cmu=cmu/cn
+        mu=mu/n
+        for i in range(len(images correct)):
+            csigma= (image[i]-cmu)**2
+        csigma=math.sqrt(csigma)/cn
+
+        for i in range(len(images incorrect)):
+            sigma= (image[i]-mu)**2
+        sigma=math.sqrt(sigma)/n
+
+def prior(cmu,csigma,mu,sigma);
+    return (random.normal(cmu,csigma)*fc)/(random.normal(cmu,csigma)f(c)+random.normal(mu, sigma)(1-f(c))
 
 
+def Bayesian(image, covariancematrix,cmu,csigma,mu,sigma):
+    return (random.normal(image,covariancematrix)*prior(cmu,csigma,mu,sigma))/(random.normal(image,covariancematrix)f(c)+random.normal(idk what to put here)(1-f(c)))
 
-def BayesModelTrain(correct):
-    BMN=j(image[1],correct) #BMN stands for Bayesian Model Numerator
+confidences=[]
+def BayesianSort(images, covariancematrix,cmu,csigma,mu,sigma):
+    for i in range(len(images)):
+        confidences.append(Bayesian(image[i], covariancematrix,cmu,csigma,mu,sigma))
+    return confidences
 
-    for i in range (len(images)-1):
-        BM=j(image[i],correct)*BM
-
-    return BM
-
-phic=BayesModelTrain(Whatevercorrectis)/(fc**(len(images)-1)
-phic1=BayesModelTrain(whateverincorrectis)/fc1**(len(images)-1)
-
-def BM():
-    phic/(phic+phic1)
 
 
 '''
@@ -265,14 +292,17 @@ all_conf = []
 all_images = []
 all_labels = []
 
-meta_model.eval()
+#meta_model.eval()
 
 with torch.no_grad():
     for images, labels in test_loader:
         images = images.to(device)
 
-        meta_outputs = meta_model(images)
-        confidence = torch.softmax(meta_outputs, dim=1)[:, 1]
+        for i in range(images[3].size):
+            covariancematrix.append(1)
+
+        meta_outputs = BayesianSort(images, covariancematrix,cmu,csigma,mu,sigma)
+        confidence = torch.softmax(meta_outputs, dim=1)[:, 1] #might need to comment this line out
 
         all_conf.append(confidence.cpu())
         all_images.append(images.cpu())

@@ -5,12 +5,12 @@ import torchvision
 import torchvision.transforms as transforms
 from torchvision import models
 from torch.utils.data import DataLoader, random_split, TensorDataset
+import random
 
-print("CIFAR10 data set")
+print("Fake data set")
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-'''
 
 from torchvision.datasets import FakeData
 
@@ -72,6 +72,7 @@ train_loader = DataLoader(train_set, batch_size=32, shuffle=True)
 probe_loader = DataLoader(probe_set, batch_size=32, shuffle=False)
 test_loader = DataLoader(test_set, batch_size=32, shuffle=False)
 
+'''
 
 base_model = models.googlenet(
     weights=None,
@@ -88,7 +89,7 @@ base_optimizer = optim.SGD(
 
 criterion = nn.CrossEntropyLoss()
 
-for epoch in range(50):
+for epoch in range(10):
     base_model.train()
     total_loss = 0
     correct = 0
@@ -113,55 +114,6 @@ for epoch in range(50):
         f"loss={total_loss/len(train_loader):.4f} | "
         f"acc={100*correct/total:.2f}%"
     )
-'''
-def finr(percent):
-    for images, labels in train_loader:
-
-        images = images.to(device)
-        labels = labels.to(device)
-    
-        cutoff = int(
-            percent * len(images)
-        )
-
-
-
-        top_images = images[:cutoff].to(device)
-
-        top_labels = labels[:cutoff].to(device)
-
-        base_model.eval()
-
-        with torch.no_grad():
-
-            outputs = base_model(top_images)
-
-            loss = criterion(
-                outputs,
-                top_labels
-            )
-
-            preds = outputs.argmax(dim=1)
-
-            correct = (
-                preds == top_labels
-            ).sum().item()
-    
-            total = top_labels.size(0)
-
-        print(
-            f"DR={percent:.1f} "
-            f"loss={loss.item():.4f} "
-            f"acc={100*correct/total:.2f}%"
-            )
-
-print("Random") 
-percent=0.1
-for I in range(10):
-    finr(percent)
-    percent+=0.1
-'''
-
 
 def create_meta_dataset(base_model, loader):
     base_model.eval()
@@ -192,13 +144,14 @@ def create_meta_dataset(base_model, loader):
 
     return TensorDataset(meta_images, meta_labels)
 
-fc=correct/total 
-int fc1 = 1-fc
+fc=correct/total
+fc1 = 1-fc
 cmu=[]
 csigma=[]
 mu=[]
 sigma=[]
-cn,n=0
+cn=0
+n=0
 
 def normalparams(image, correct,finished):
     if (finished==0):
@@ -213,78 +166,26 @@ def normalparams(image, correct,finished):
     if (finished==1):
         cmu=cmu/cn
         mu=mu/n
-        for i in range(len(images correct)):
+        for i in range(cn):
             csigma= (image[i]-cmu)**2
         csigma=math.sqrt(csigma)/cn
 
-        for i in range(len(images incorrect)):
+        for i in range(n):
             sigma= (image[i]-mu)**2
         sigma=math.sqrt(sigma)/n
 
-def prior(cmu,csigma,mu,sigma);
-    return (random.normal(cmu,csigma)*fc)/(random.normal(cmu,csigma)f(c)+random.normal(mu, sigma)(1-f(c))
+def prior(cmu,csigma,mu,sigma):
+    return (random.normal(cmu,csigma)*fc)/(random.normal(cmu,csigma)*f(c)+random.normal(mu, sigma)*(1-f(c)))
 
 
 def Bayesian(image, covariancematrix,cmu,csigma,mu,sigma):
-    return (random.normal(image,covariancematrix)*prior(cmu,csigma,mu,sigma))/(random.normal(image,covariancematrix)f(c)+random.normal(idk what to put here)(1-f(c)))
+    return (random.normal(image,covariancematrix)*prior(cmu,csigma,mu,sigma))/(random.normal(image,covariancematrix)*f(c)+random.normal(image,covariancematrix)*(1-f(c)))
 
 confidences=[]
 def BayesianSort(images, covariancematrix,cmu,csigma,mu,sigma):
     for i in range(len(images)):
-        confidences.append(Bayesian(image[i], covariancematrix,cmu,csigma,mu,sigma))
+        confidences.append(Bayesian(images[i], covariancematrix,cmu,csigma,mu,sigma))
     return confidences
-
-
-
-'''
-meta_train_set = create_meta_dataset(base_model, probe_loader)
-meta_train_loader = DataLoader(meta_train_set, batch_size=32, shuffle=True)
-
-meta_model = models.resnet50(weights=None)
-meta_model.fc = nn.Linear(meta_model.fc.in_features, 2)
-meta_model = meta_model.to(device)
-
-meta_optimizer = optim.SGD(
-    meta_model.parameters(),
-    lr=1e-3,
-    momentum=0.7,
-    weight_decay=5e-2
-)
-
-meta_train_set = create_meta_dataset(base_model, probe_loader)
-
-meta_labels = torch.tensor([label for _, label in meta_train_set])
-print("Meta dataset size:", len(meta_train_set))
-print("Base correct labels:", meta_labels.sum().item())
-print("Base wrong labels:", len(meta_labels) - meta_labels.sum().item())
-
-for epoch in range(5):
-    meta_model.train()
-    total_loss = 0
-    correct = 0
-    total = 0
-
-    for images, correctness_labels in meta_train_loader:
-        images = images.to(device)
-        correctness_labels = correctness_labels.to(device)
-
-        meta_optimizer.zero_grad()
-        outputs = meta_model(images)
-        loss = criterion(outputs, correctness_labels)
-        loss.backward()
-        meta_optimizer.step()
-
-        total_loss += loss.item()
-        preds = outputs.argmax(dim=1)
-        correct += (preds == correctness_labels).sum().item()
-        total += correctness_labels.size(0)
-
-    print(
-        f"Meta epoch {epoch+1}/5 | "
-        f"loss={total_loss/len(meta_train_loader):.4f} | "
-        f"acc={100*correct/total:.2f}%"
-    )
-'''    
 
 print("Sorting")
 
@@ -292,14 +193,14 @@ all_conf = []
 all_images = []
 all_labels = []
 
-#meta_model.eval()
-
 with torch.no_grad():
     for images, labels in test_loader:
         images = images.to(device)
 
-        for i in range(images[3].size):
-            covariancematrix.append(1)
+
+        covariancematrix=images[3]
+        covariancematrix[covariancematrix>1]=1
+        covariancematrix[covariancematrix<1]=1
 
         meta_outputs = BayesianSort(images, covariancematrix,cmu,csigma,mu,sigma)
         confidence = torch.softmax(meta_outputs, dim=1)[:, 1] #might need to comment this line out
@@ -358,6 +259,3 @@ percent=0.1
 for I in range(10):
     fin(percent)
     percent+=0.1
-
-
-

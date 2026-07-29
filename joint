@@ -1,0 +1,13 @@
+Using f(theta|c)= f(theta,c)/(f(c))
+
+Train base model
+
+def joint(image,x1,x2,b): #this is f(theta,c)
+  tensor.sqrt((x2^2*image+x1*image+b)**2/integral over the whole support
+
+def train_joint():
+  loss=tensor.sqrt((correct-joint(image,x1,x2,b)**2) #correct is set to either 1 or 0
+  find gradient of loss
+  adjust x1,x2,b
+
+literally the same architeture 
